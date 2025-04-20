@@ -292,6 +292,62 @@ module.exports = createCoreController('api::serial-number.serial-number');
     else:
         print(f"Serial-number controller file already exists and is not empty: {controller_file}")
 
+def ensure_serial_number_schema():
+    """Ensure the serial-number schema file exists and is not empty."""
+    schema_file = "/opt/strapi/src/api/serial-number/content-types/serial-number/schema.json"
+    schema_dir = os.path.dirname(schema_file)
+    default_schema_content = """{
+  "kind": "collectionType",
+  "collectionName": "serial_numbers",
+  "info": {
+    "singularName": "serial-number",
+    "pluralName": "serial-numbers",
+    "displayName": "Serial Number"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "serial_start": {
+      "type": "integer",
+      "required": true
+    },
+    "serial_end": {
+      "type": "integer",
+      "required": true
+    },
+    "model_name": {
+      "type": "string"
+    },
+    "year_produced": {
+      "type": "string"
+    },
+    "taking_lens": {
+      "type": "string"
+    },
+    "looking_lens": {
+      "type": "string"
+    },
+    "description": {
+      "type": "text"
+    }
+  }
+}
+"""
+
+    # Create the content-types/serial-number directory if it doesn't exist
+    if not os.path.exists(schema_dir):
+        os.makedirs(schema_dir)
+        print(f"Created directory: {schema_dir}")
+
+    # Check if the schema file exists and is not empty
+    if not os.path.exists(schema_file) or os.path.getsize(schema_file) == 0:
+        with open(schema_file, 'w') as f:
+            f.write(default_schema_content)
+        print(f"Created serial-number schema file: {schema_file}")
+    else:
+        print(f"Serial-number schema file already exists and is not empty: {schema_file}")
+
 def main():
     parser = argparse.ArgumentParser(description="Switch Strapi between dev and prod environments")
     parser.add_argument("mode", choices=["dev", "prod"], help="Environment mode (dev or prod)")
@@ -306,6 +362,7 @@ def main():
     git_commit_and_push(args.mode)
     clear_caches()
     ensure_serial_number_controller()  # Ensure the controller file exists
+    ensure_serial_number_schema()     # Ensure the schema file exists
     manage_services(args.mode)
 
 if __name__ == "__main__":
