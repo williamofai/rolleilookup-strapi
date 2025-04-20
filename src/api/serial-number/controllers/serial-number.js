@@ -4,7 +4,6 @@ const { Client } = require('pg');
 
 module.exports = {
   async find(ctx) {
-    // Set up PostgreSQL client for rolleiflex_db
     const client = new Client({
       host: '127.0.0.1',
       port: 5432,
@@ -14,13 +13,8 @@ module.exports = {
     });
 
     try {
-      // Connect to the database
       await client.connect();
-
-      // Query the rolleiflex_cameras table
       const result = await client.query('SELECT * FROM rolleiflex_cameras');
-
-      // Transform the data to match Strapi's API response format
       const formattedData = result.rows.map(row => ({
         id: row.id,
         attributes: {
@@ -46,10 +40,14 @@ module.exports = {
         },
       };
     } catch (error) {
-      console.error('Error querying rolleiflex_db:', error);
-      ctx.throw(500, 'Internal Server Error');
+      console.error('Error querying rolleiflex_db:', error.message);
+      ctx.throw(500, `Internal Server Error: ${error.message}`);
     } finally {
-      await client.end();
+      try {
+        await client.end();
+      } catch (endError) {
+        console.error('Error closing database connection:', endError.message);
+      }
     }
   },
 
@@ -67,7 +65,13 @@ module.exports = {
     try {
       await client.connect();
 
-      const result = await client.query('SELECT * FROM rolleiflex_cameras WHERE id = $1', [id]);
+      // Validate ID as a number to prevent SQL injection
+      const parsedId = parseInt(id, 10);
+      if (isNaN(parsedId)) {
+        ctx.throw(400, 'Invalid ID: ID must be a number');
+      }
+
+      const result = await client.query('SELECT * FROM rolleiflex_cameras WHERE id = $1', [parsedId]);
 
       if (result.rows.length === 0) {
         ctx.throw(404, 'Serial number not found');
@@ -90,10 +94,32 @@ module.exports = {
         meta: {},
       };
     } catch (error) {
-      console.error('Error querying rolleiflex_db:', error);
-      ctx.throw(500, 'Internal Server Error');
+      console.error('Error querying rolleiflex_db:', error.message);
+      // If the error is already a Strapi error (e.g., 400, 404), rethrow it
+      if (error.status) {
+        throw error;
+      }
+      // Otherwise, throw a 500 error with the original message
+      ctx.throw(500, `Internal Server Error: ${error.message}`);
     } finally {
-      await client.end();
+      try {
+        await client.end();
+      } catch (endError) {
+        console.error('Error closing database connection:', endError.message);
+      }
     }
+  },
+
+  // Disable create, update, delete operations as the data is read-only
+  async create(ctx) {
+    ctx.throw(405, 'Method Not Allowed: Create operation is not supported for this read-only API');
+  },
+
+  async update(ctx) {
+    ctx.throw(405, 'Method Not Allowed: Update operation is not supported for this read-only API');
+  },
+
+  async delete(ctx) {
+    ctx.throw(405, 'Method Not Allowed: Delete operation is not supported for this read-only API');
   },
 };
