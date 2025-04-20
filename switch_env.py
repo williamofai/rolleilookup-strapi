@@ -146,15 +146,19 @@ def update_nginx_config():
         exit(1)
 
 def clear_caches():
-    """Clear Strapi and Vite caches."""
+    """Clear Strapi and Vite caches, including admin panel cache."""
     cache_dirs = [
         "/opt/strapi/.cache",
         "/opt/strapi/build",
         "/opt/strapi/node_modules/.vite"
     ]
     for cache_dir in cache_dirs:
-        subprocess.run(["rm", "-rf", cache_dir], check=True)
-    print("Cleared caches")
+        try:
+            subprocess.run(["rm", "-rf", cache_dir], check=True)
+            print(f"Cleared cache directory: {cache_dir}")
+        except subprocess.CalledProcessError as e:
+            print(f"Error clearing cache directory {cache_dir}: {e}")
+    print("Cleared all caches")
 
 def git_commit_and_push(mode):
     """Commit and push changes to Git repository."""
