@@ -198,9 +198,10 @@ def clear_caches():
     print("Cleared all caches (preserving /opt/strapi/build)")
 
 def git_commit_and_push(mode):
-    """Commit and push changes to Git repository."""
+    """Commit and push changes to Git repository without affecting untracked files."""
     os.chdir(STRAPI_DIR)
     try:
+        # Stage only the specified files
         subprocess.run(["git", "add", "config/server.js", "config/middlewares.js", "deploy/rolleilookup.com.conf", "switch_env.py"], check=True)
         if os.path.exists(VITE_FILE):
             subprocess.run(["git", "rm", "-f", "vite.config.js"], check=True)
@@ -267,6 +268,30 @@ def manage_services(mode):
         subprocess.run(["sudo", "systemctl", "start", "rolleiflex-frontend"], check=True)
         print("Started strapi-prod and rolleiflex-frontend services")
 
+def ensure_serial_number_controller():
+    """Ensure the serial-number controller file exists and is not empty."""
+    controller_file = "/opt/strapi/src/api/serial-number/controllers/serial-number.js"
+    controller_dir = os.path.dirname(controller_file)
+    default_controller_content = """'use strict';
+
+const { createCoreController } = require('@strapi/strapi').factories;
+
+module.exports = createCoreController('api::serial-number.serial-number');
+"""
+
+    # Create the controllers directory if it doesn't exist
+    if not os.path.exists(controller_dir):
+        os.makedirs(controller_dir)
+        print(f"Created directory: {controller_dir}")
+
+    # Check if the controller file exists and is not empty
+    if not os.path.exists(controller_file) or os.path.getsize(controller_file) == 0:
+        with open(controller_file, 'w') as f:
+            f.write(default_controller_content)
+        print(f"Created serial-number controller file: {controller_file}")
+    else:
+        print(f"Serial-number controller file already exists and is not empty: {controller_file}")
+
 def main():
     parser = argparse.ArgumentParser(description="Switch Strapi between dev and prod environments")
     parser.add_argument("mode", choices=["dev", "prod"], help="Environment mode (dev or prod)")
@@ -280,6 +305,7 @@ def main():
     update_nginx_config()
     git_commit_and_push(args.mode)
     clear_caches()
+    ensure_serial_number_controller()  # Ensure the controller file exists
     manage_services(args.mode)
 
 if __name__ == "__main__":
