@@ -86,4 +86,55 @@ def clear_caches():
         "/opt/strapi/node_modules/.vite"
     ]
     for cache_dir in cache_dirs:
-        subprocess.run(["rm", "-
+        subprocess.run(["rm", "-rf", cache_dir], check=True)
+    print("Cleared caches")
+
+def git_commit_and_push(mode):
+    """Commit and push changes to Git repository."""
+    os.chdir(STRAPI_DIR)
+    try:
+        subprocess.run(["git", "add", "config/server.js", "deploy/rolleilookup.com.conf", "switch_env.py"], check=True)
+        commit_message = f"Switch to {mode} mode"
+        subprocess.run(["git", "commit", "-m", commit_message], check=True)
+        subprocess.run(["git", "push", "origin", "main"], check=True)
+        print(f"Committed and pushed changes to Git: {commit_message}")
+    except subprocess.CalledProcessError as e:
+        print(f"Error during Git operations: {e}")
+        if "nothing to commit" in str(e):
+            print("No changes to commit")
+
+def manage_services(mode):
+    """Stop all services and start the appropriate ones based on mode."""
+    services = ["strapi-dev", "strapi-prod", "rolleiflex-frontend"]
+    for service in services:
+        try:
+            subprocess.run(["sudo", "systemctl", "stop", service], check=True)
+            print(f"Stopped {service}")
+        except subprocess.CalledProcessError:
+            print(f"Service {service} was not running")
+
+    time.sleep(2)
+
+    if mode == "dev":
+        subprocess.run(["sudo", "systemctl", "start", "strapi-dev"], check=True)
+        print("Started strapi-dev service")
+    else:
+        subprocess.run(["sudo", "systemctl", "start", "strapi-prod"], check=True)
+        subprocess.run(["sudo", "systemctl", "start", "rolleiflex-frontend"], check=True)
+        print("Started strapi-prod and rolleiflex-frontend services")
+
+def main():
+    parser = argparse.ArgumentParser(description="Switch Strapi between dev and prod environments")
+    parser.add_argument("mode", choices=["dev", "prod"], help="Environment mode (dev or prod)")
+    args = parser.parse_args()
+
+    config = DEV_CONFIG if args.mode == "dev" else PROD_CONFIG
+    update_env_file(config)
+    update_server_file(config)
+    update_nginx_config()
+    git_commit_and_push(args.mode)
+    clear_caches()
+    manage_services(args.mode)
+
+if __name__ == "__main__":
+    main()
