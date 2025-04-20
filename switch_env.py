@@ -161,11 +161,10 @@ def git_commit_and_push(mode):
     os.chdir(STRAPI_DIR)
     try:
         subprocess.run(["git", "add", "config/server.js", "config/middlewares.js", "deploy/rolleilookup.com.conf", "switch_env.py"], check=True)
-        # Remove vite.config.js from Git tracking if it exists
         if os.path.exists(VITE_FILE):
             subprocess.run(["git", "rm", "-f", "vite.config.js"], check=True)
         else:
-            subprocess.run(["git", "rm", "-f", "vite.config.js"], check=False)  # Ignore if not tracked
+            subprocess.run(["git", "rm", "-f", "vite.config.js"], check=False)
         commit_message = f"Switch to {mode} mode"
         subprocess.run(["git", "commit", "-m", commit_message], check=True)
         subprocess.run(["git", "push", "origin", "main"], check=True)
@@ -174,6 +173,17 @@ def git_commit_and_push(mode):
         print(f"Error during Git operations: {e}")
         if "nothing to commit" in str(e):
             print("No changes to commit")
+
+def ensure_admin_panel_built():
+    """Ensure the admin panel is built for prod mode."""
+    if not os.path.exists("/opt/strapi/build"):
+        print("Admin panel not built, building now...")
+        try:
+            subprocess.run(["NODE_OPTIONS=--max-old-space-size=2048 npm run build"], cwd=STRAPI_DIR, shell=True, check=True)
+            print("Admin panel built successfully")
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to build admin panel: {e}")
+            exit(1)
 
 def manage_services(mode):
     """Stop all services and start the appropriate ones based on mode."""
@@ -191,6 +201,8 @@ def manage_services(mode):
         subprocess.run(["sudo", "systemctl", "start", "strapi-dev"], check=True)
         print("Started strapi-dev service")
     else:
+        # Ensure admin panel is built before starting prod
+        ensure_admin_panel_built()
         subprocess.run(["sudo", "systemctl", "start", "strapi-prod"], check=True)
         subprocess.run(["sudo", "systemctl", "start", "rolleiflex-frontend"], check=True)
         print("Started strapi-prod and rolleiflex-frontend services")
@@ -204,7 +216,7 @@ def main():
     update_env_file(config)
     update_server_file(config)
     update_middlewares_file(args.mode)
-    remove_vite_config()  # Remove vite.config.js
+    remove_vite_config()
     update_nginx_config()
     git_commit_and_push(args.mode)
     clear_caches()
