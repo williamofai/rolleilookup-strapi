@@ -1,0 +1,37 @@
+{
+  "kind": "collectionType",
+  "collectionName": "serial_numbers",
+  "info": {
+    "singularName": "serial-number",
+    "pluralName": "serial-numbers",
+    "displayName": "Serial Number"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "serial_start": {
+      "type": "integer",
+      "required": true
+    },
+    "serial_end": {
+      "type": "integer",
+      "required": true
+    },
+    "model_name": {
+      "type": "string"
+    },
+    "year_produced": {
+      "type": "string"
+    },
+    "taking_lens": {
+      "type": "string"
+    },
+    "looking_lens": {
+      "type": "string"
+    },
+    "description": {
+      "type": "text"
+    }
+  }
+}
