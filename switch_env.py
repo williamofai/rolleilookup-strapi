@@ -9,6 +9,8 @@ import time
 # File paths
 ENV_FILE = "/opt/strapi/.env"
 SERVER_FILE = "/opt/strapi/config/server.js"
+MIDDLEWARES_FILE = "/opt/strapi/config/middlewares.js"
+VITE_FILE = "/opt/strapi/vite.config.js"
 NGINX_SRC = "/opt/strapi/deploy/rolleilookup.com.conf"
 NGINX_DEST = "/etc/nginx/sites-enabled/rolleilookup.com"
 STRAPI_DIR = "/opt/strapi"
@@ -25,6 +27,49 @@ PROD_CONFIG = {
     "ADMIN_URL": "https://rolleilookup.com/admin",
     "NODE_ENV": "production",
 }
+
+# Middleware configurations for dev and prod
+DEV_MIDDLEWARES_CONFIG = """
+module.exports = [
+  'strapi::errors',
+  {
+    name: 'strapi::cors',
+    config: {
+      origin: ['http://localhost:1337', 'http://127.0.0.1:1337'],
+      headers: ['Content-Type', 'Authorization', 'X-Frame-Options'],
+    },
+  },
+  'strapi::security',
+  'strapi::poweredBy',
+  'strapi::logger',
+  'strapi::query',
+  'strapi::body',
+  'strapi::session',
+  'strapi::favicon',
+  'strapi::public',
+];
+"""
+
+PROD_MIDDLEWARES_CONFIG = """
+module.exports = [
+  'strapi::errors',
+  {
+    name: 'strapi::cors',
+    config: {
+      origin: ['https://rolleilookup.com'],
+      headers: ['Content-Type', 'Authorization', 'X-Frame-Options'],
+    },
+  },
+  'strapi::security',
+  'strapi::poweredBy',
+  'strapi::logger',
+  'strapi::query',
+  'strapi::body',
+  'strapi::session',
+  'strapi::favicon',
+  'strapi::public',
+];
+"""
 
 def update_env_file(config):
     """Update .env file with the specified configuration."""
@@ -53,17 +98,39 @@ def update_env_file(config):
     print(f"Updated {ENV_FILE} with {config}")
 
 def update_server_file(config):
-    """Update config/server.js with the specified URL."""
-    with open(SERVER_FILE, 'r') as f:
-        content = f.read()
-
-    new_url = config["URL"]
-    content = re.sub(r'url: env\(\'URL\', \'[^\']*\'\)', f"url: env('URL', '{new_url}')", content)
-
+    """Update config/server.js with the specified URL and proxy setting."""
+    server_config = f"""
+module.exports = ({{ env }}) => ({{
+  host: env('HOST', '0.0.0.0'),
+  port: env.int('PORT', 1337),
+  url: env('URL', '{config["URL"]}'),
+  admin: {{
+    url: env('ADMIN_URL', '/admin'),
+  }},
+  app: {{
+    keys: env.array('APP_KEYS'),
+  }},
+  proxy: true, // Trust proxy headers from Nginx
+}});
+"""
     with open(SERVER_FILE, 'w') as f:
-        f.write(content)
+        f.write(server_config)
+    print(f"Updated {SERVER_FILE} with URL={config['URL']} and proxy=true")
 
-    print(f"Updated {SERVER_FILE} with URL={new_url}")
+def update_middlewares_file(mode):
+    """Update config/middlewares.js with the appropriate CORS origins for the mode."""
+    middlewares_config = DEV_MIDDLEWARES_CONFIG if mode == "dev" else PROD_MIDDLEWARES_CONFIG
+    with open(MIDDLEWARES_FILE, 'w') as f:
+        f.write(middlewares_config)
+    print(f"Updated {MIDDLEWARES_FILE} with CORS origins for {mode}")
+
+def remove_vite_config():
+    """Remove vite.config.js if it exists."""
+    if os.path.exists(VITE_FILE):
+        os.remove(VITE_FILE)
+        print(f"Removed {VITE_FILE}")
+    else:
+        print(f"{VITE_FILE} does not exist, skipping removal")
 
 def update_nginx_config():
     """Copy Nginx configuration to the system directory and reload Nginx."""
@@ -93,7 +160,12 @@ def git_commit_and_push(mode):
     """Commit and push changes to Git repository."""
     os.chdir(STRAPI_DIR)
     try:
-        subprocess.run(["git", "add", "config/server.js", "deploy/rolleilookup.com.conf", "switch_env.py"], check=True)
+        subprocess.run(["git", "add", "config/server.js", "config/middlewares.js", "deploy/rolleilookup.com.conf", "switch_env.py"], check=True)
+        # Remove vite.config.js from Git tracking if it exists
+        if os.path.exists(VITE_FILE):
+            subprocess.run(["git", "rm", "-f", "vite.config.js"], check=True)
+        else:
+            subprocess.run(["git", "rm", "-f", "vite.config.js"], check=False)  # Ignore if not tracked
         commit_message = f"Switch to {mode} mode"
         subprocess.run(["git", "commit", "-m", commit_message], check=True)
         subprocess.run(["git", "push", "origin", "main"], check=True)
@@ -131,6 +203,8 @@ def main():
     config = DEV_CONFIG if args.mode == "dev" else PROD_CONFIG
     update_env_file(config)
     update_server_file(config)
+    update_middlewares_file(args.mode)
+    remove_vite_config()  # Remove vite.config.js
     update_nginx_config()
     git_commit_and_push(args.mode)
     clear_caches()
