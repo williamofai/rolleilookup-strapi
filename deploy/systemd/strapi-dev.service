@@ -1,0 +1,14 @@
+[Unit]
+Description=Strapi Development Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/strapi
+Environment="NODE_ENV=development"
+ExecStart=/usr/bin/npm run develop
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+[Unit]
+Description=Rolleiflex Node.js Frontend
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/rolleiflex-frontend
+ExecStart=/usr/bin/npm start
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

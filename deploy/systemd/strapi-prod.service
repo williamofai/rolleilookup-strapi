@@ -1,0 +1,14 @@
+[Unit]
+Description=Strapi Production Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/strapi
+Environment="NODE_ENV=production"
+ExecStart=/bin/bash -c "npm run build && npm run start"
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
