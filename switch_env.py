@@ -187,6 +187,7 @@ def ensure_admin_panel_built():
 
 def manage_services(mode):
     """Stop all services and start the appropriate ones based on mode."""
+    # Step a: Stop the dev service (strapi-dev) and ensure port 1337 is free
     services = ["strapi-dev", "strapi-prod", "rolleiflex-frontend"]
     for service in services:
         try:
@@ -195,8 +196,26 @@ def manage_services(mode):
         except subprocess.CalledProcessError:
             print(f"Service {service} was not running")
 
+    # Forcefully kill any lingering Strapi processes on port 1337
+    try:
+        result = subprocess.run(
+            ["lsof", "-i", ":1337", "-t"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        pids = result.stdout.strip().split('\n')
+        for pid in pids:
+            if pid:
+                subprocess.run(["sudo", "kill", "-9", pid], check=True)
+                print(f"Killed lingering process on port 1337 with PID {pid}")
+    except subprocess.CalledProcessError:
+        print("No lingering processes found on port 1337")
+
     time.sleep(2)
 
+    # Step b: Config files are already updated by previous steps
+    # Step c: Start the prod service (strapi-prod) and frontend
     if mode == "dev":
         subprocess.run(["sudo", "systemctl", "start", "strapi-dev"], check=True)
         print("Started strapi-dev service")
