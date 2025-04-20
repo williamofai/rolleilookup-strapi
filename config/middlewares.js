@@ -4,7 +4,7 @@ module.exports = [
   {
     name: 'strapi::cors',
     config: {
-      origin: ['https://rolleilookup.com'],
+      origin: ['http://localhost:1337', 'http://127.0.0.1:1337'],
       headers: ['Content-Type', 'Authorization', 'X-Frame-Options'],
     },
   },
