@@ -10,4 +10,8 @@ module.exports = ({ env }) => ({
     keys: env.array('APP_KEYS'),
   },
   proxy: true, // Trust proxy headers from Nginx
+  async bootstrap({ strapi }) {
+    const syncSerialNumbers = require('../scripts/sync-serial-numbers');
+    await syncSerialNumbers({ strapi });
+  },
 });

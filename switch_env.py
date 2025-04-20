@@ -36,10 +36,26 @@ module.exports = [
     name: 'strapi::cors',
     config: {
       origin: ['http://localhost:1337', 'http://127.0.0.1:1337'],
-      headers: ['Content-Type', 'Authorization', 'X-Frame-Options'],
+      headers: ['Content-Type', 'Authorization', 'X-Frame-Options', 'Origin', 'Accept'],
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     },
   },
-  'strapi::security',
+  {
+    name: 'strapi::security',
+    config: {
+      contentSecurityPolicy: {
+        useDefaults: true,
+        directives: {
+          'connect-src': ["'self'", 'https:', 'http:'],
+          'img-src': ["'self'", 'data:', 'blob:'],
+          'media-src': ["'self'", 'data:', 'blob:'],
+          'script-src': ["'self'", "'unsafe-inline'"],
+          'style-src': ["'self'", "'unsafe-inline'"],
+          upgradeInsecureRequests: null,
+        },
+      },
+    },
+  },
   'strapi::poweredBy',
   'strapi::logger',
   'strapi::query',
@@ -47,6 +63,7 @@ module.exports = [
   'strapi::session',
   'strapi::favicon',
   'strapi::public',
+  'global::error-handler',
 ];
 """
 
@@ -56,11 +73,27 @@ module.exports = [
   {
     name: 'strapi::cors',
     config: {
-      origin: ['https://rolleilookup.com'],
-      headers: ['Content-Type', 'Authorization', 'X-Frame-Options'],
+      origin: ['https://rolleilookup.com', 'https://rolleilookup.com/admin'],
+      headers: ['Content-Type', 'Authorization', 'X-Frame-Options', 'Origin', 'Accept'],
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     },
   },
-  'strapi::security',
+  {
+    name: 'strapi::security',
+    config: {
+      contentSecurityPolicy: {
+        useDefaults: true,
+        directives: {
+          'connect-src': ["'self'", 'https:', 'http:'],
+          'img-src': ["'self'", 'data:', 'blob:', 'https://*.digitaloceanspaces.com'],
+          'media-src': ["'self'", 'data:', 'blob:', 'https://*.digitaloceanspaces.com'],
+          'script-src': ["'self'", "'unsafe-inline'", 'https://rolleilookup.com'],
+          'style-src': ["'self'", "'unsafe-inline'"],
+          upgradeInsecureRequests: null,
+        },
+      },
+    },
+  },
   'strapi::poweredBy',
   'strapi::logger',
   'strapi::query',
@@ -68,6 +101,7 @@ module.exports = [
   'strapi::session',
   'strapi::favicon',
   'strapi::public',
+  'global::error-handler',
 ];
 """
 
@@ -111,6 +145,10 @@ module.exports = ({{ env }}) => ({{
     keys: env.array('APP_KEYS'),
   }},
   proxy: true, // Trust proxy headers from Nginx
+  async bootstrap({{ strapi }}) {{
+    const syncSerialNumbers = require('../scripts/sync-serial-numbers');
+    await syncSerialNumbers({{ strapi }});
+  }},
 }});
 """
     with open(SERVER_FILE, 'w') as f:
@@ -146,10 +184,9 @@ def update_nginx_config():
         exit(1)
 
 def clear_caches():
-    """Clear Strapi and Vite caches, including admin panel cache."""
+    """Clear Strapi and Vite caches, excluding admin panel build directory."""
     cache_dirs = [
         "/opt/strapi/.cache",
-        "/opt/strapi/build",
         "/opt/strapi/node_modules/.vite"
     ]
     for cache_dir in cache_dirs:
@@ -158,7 +195,7 @@ def clear_caches():
             print(f"Cleared cache directory: {cache_dir}")
         except subprocess.CalledProcessError as e:
             print(f"Error clearing cache directory {cache_dir}: {e}")
-    print("Cleared all caches")
+    print("Cleared all caches (preserving /opt/strapi/build)")
 
 def git_commit_and_push(mode):
     """Commit and push changes to Git repository."""
